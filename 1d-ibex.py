@@ -11,14 +11,13 @@ from pathlib import Path
 from datetime import datetime
 
 SCRIPT_NAME = '1D-IBEX : 1D Image Barcode EXtractor'
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 
 RESULT_IMAGE_EXT = '.png' # Can be any type handled by OpenCV, see documentation for valid values.
 DETECTION_IMAGE_MAX_DIM = 1024 # In pixels, if the lagest dimension (width or height) of the input image is
 #                                bigger than this value the image will be downscale ONLY for paper detect calculations.
 #                                Smaller value mean faster computation but less accuracy.
-MAX_CONTOUR_AREA = 0. # Set directly by the function 
-MIN_CONTOUR_PERIMETER = DETECTION_IMAGE_MAX_DIM * .05 # Contours perimeters below this value will be skipped.
+MIN_COMPONENT_AREA = DETECTION_IMAGE_MAX_DIM * .05 # Contours below this value will be skipped.
 MIN_BARCODE_RECT_RATIO = 4. # Minimum ratio to consider a rectangle to be part of a barcode
 SIMPLIFIED_CONTOUR_MAX_COEF = .15 # Maximum ratio of simplification allowed for the contour point reduction (e.g. simplify_contour function)
 MIN_SPLIT_BARECODE = 70 # Minium number of columns in a barecode
@@ -198,7 +197,7 @@ def scale_contour_from_centroid(contour: NDArray[numpy.float32], scale: float, t
 
     # Step 4: Move back the contour to it position
     contour = contour + [center_x, center_y]
-    
+
     if to_int:
         return (numpy.rint(contour)).astype(int)
 
@@ -342,51 +341,65 @@ def extract_barcode(image: NDArray[numpy.uint8], corners: NDArray[numpy.float32]
 
     return barcode
 
-def find_image_contours(image: NDArray[numpy.uint8], use_adaptive_treshold:bool, image_index: int)-> list[NDArray[numpy.float32]]:
+def find_candidates(image: NDArray[numpy.uint8], use_adaptive_treshold:bool, image_index: int)-> list[BarCandidate]:
+    height, width = image.shape[:2]
+
     # Step 1: Apply threshold to be able to detect barcode lines
     if use_adaptive_treshold:
         # Blocksize is 1/10 of the smallest of the two dimensions rounded to the nearest odd number
-        height, width = image.shape[:2]
         blocksize = int(math.ceil(min(width, height) * .05) * 2 + 1)
         c_const = round(blocksize * .1)# 1/10 of blocksize
-        image = cv.adaptiveThreshold(image, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, blocksize, c_const)
+        image = cv.adaptiveThreshold(image, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, blocksize, c_const)
     else:
-        image = cv.threshold(image, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)[1]
+        image = cv.threshold(image, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)[1]
 
     if DEBUG:
         save_to_results_folder(image, 'Image-{:03d}_DEBUG_03_Treshold'.format(image_index))
 
-    # Step 2: Find contours
-    contours , _ = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    # Step 2: Create candidates list
 
-    return contours
+    max_component_area = (width * height) / MIN_SPLIT_BARECODE # Used to discard too big components
 
-def find_groups(contours: list[NDArray[numpy.float32]], max_contour_area:float)->list[list[BarCandidate]]:
-    # Step 1: Store bars candidates
+    # Step 2.A: Compute Connected Components
     candidates = []
-
-    for contour in contours:
-        contour = cv.convexHull(contour)
-
-        perimeter = cv.arcLength(contour, True)
-        area = cv.contourArea(contour)
-
-        if perimeter < MIN_CONTOUR_PERIMETER or area > max_contour_area:
+    (count_labels, labels, stats, _) = cv.connectedComponentsWithStatsWithAlgorithm(image, connectivity=8, ltype=cv.CV_32S, ccltype=cv.CCL_GRANA)
+    for index in range(1, count_labels):
+        # Step 2.B: Filter too small or too big components
+        area = stats[index, cv.CC_STAT_AREA]
+        if area < MIN_COMPONENT_AREA or area > max_component_area:
             continue
 
-        rect = cv.minAreaRect(contour)
+        # Step 2.C: Create a custom ROI "image", containing only the current component
+        x = stats[index, cv.CC_STAT_LEFT]
+        y = stats[index, cv.CC_STAT_TOP]
+        w = stats[index, cv.CC_STAT_WIDTH]
+        h = stats[index, cv.CC_STAT_HEIGHT]
+
+        roi_label = labels[y:y+h, x:x+w]
+        roi = (roi_label == index).astype("uint8") * 255
+
+        # Step 2.D: Find contours inside this ROI
+        roi_contours , _ = cv.findContours(roi, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE, offset=(x, y))
+
+        # Step 2.E: Merge all these contours and get the min rect
+        points = numpy.empty(shape=(0,1,2), dtype=numpy.int32)
+
+        for roi_contour in roi_contours:
+            points = numpy.append(points, roi_contour, 0)
+
+        rect = cv.minAreaRect(points)
+
+        # Step 2.F: Filter the components that doesn't look like bars
         (width, height) = rect[1]
         if (max(width, height) / max(min(width, height), 1.)) < MIN_BARCODE_RECT_RATIO:
             continue
 
-        contour = cv.boxPoints(rect)
+        candidates.append(BarCandidate(numpy.squeeze(cv.boxPoints(rect)), area, rect[1]))
 
-        candidates.append(BarCandidate(numpy.squeeze(contour), area, rect[1]))
+    return candidates
 
-    if not candidates:
-        return None
-
-    # Step 2: Group linked bars, approx similar angles + close to each others
+def find_groups(candidates: list[BarCandidate])->list[list[BarCandidate]]:
+    # Step 1: Group linked bars, approx similar angles + close to each others
     groups = []
     while len(candidates):
         group = [candidates.pop()]
@@ -439,7 +452,7 @@ def check_need_rotation(corners: NDArray[numpy.float32])-> bool:
     # Step 1: Compute vectors of edge 1 and 2 of the shape
     side_top_vec = corners[1] - corners[0]
     side_rgh_vec = corners[2] - corners[1]
-    
+
     # Step 2: Determine if the result need a 90 degrees rotation
     #         we can do a simple test because we have ordered the the corners in clockwise
     #         and first point is the closest to top left corner of image.
@@ -539,15 +552,13 @@ def main(images_paths: list[str], use_adaptive_treshold:bool=False)-> bool:
         if DEBUG:
             save_to_results_folder(gray, 'Image-{:03d}_DEBUG_02_Downscale'.format(image_index))
 
-        # Step 2.E: Find the contours
-        contours = find_image_contours(gray, use_adaptive_treshold, image_index)
+        # Step 2.E: Find the bars candidates
+        candidates = find_candidates(gray, use_adaptive_treshold, image_index)
+        if not candidates:
+            continue
 
         # Step 2.G: Find the groups of bars
-        height, width = gray.shape[:2]
-        # Info: max_contour_area is a value computed from the area of the downscaled image
-        # used exclude / discard to big contours
-        max_contour_area = (width * height) / MIN_SPLIT_BARECODE
-        groups = find_groups(contours, max_contour_area)
+        groups = find_groups(candidates)
 
         # Step 2.H: Extract barcodes
         scale_factor = (1.0 / downscale_factor)
