@@ -28,6 +28,14 @@ python3 1d-ibex.py -i ~/Desktop/IMG_3205.png ./object_12.jpg ~/Documents/photo_0
 ```
 Inside the result subfolder, extracted paper sheets will be named `barcode_001.png`, `barcode_002.png`, `barcode_003.png`, ...
 
+## Not working ?
+If the barcode hasn't been extracted (or the resulting barcode image isn't perfect) this can be due to the OTSU threshold method.
+You can try using the script with the argument `-a` (or `--adaptive-treshold`):
+```sh
+python3 1d-ibex.py -i ~/Desktop/IMG_3205.png -a
+```
+This threshold method isn't the default one because it's slower then the default one (OTSU).
+
 ## Debug
 
 You can visualize some steps of the sheet detection by adding the argument `-d` or `--debug` to the command:
@@ -41,10 +49,6 @@ This will add debug images into the result subfolder.
 In case of an error you should see a formated log message in your terminal telling you exactly what is the issue.
 If the script crash or something don't work you can open an issue [here](https://github.com/BenSouchet/1d-ibex/issues).
 
-## Improvements
-- use `numpy.ascontiguousarray` on images arrays to use them as output or dest array, reducing allocations
-- Adding more timing debug to detect bottle necks in the process
-- Expose `is_document` and `max_quality` to script arguments
 
 ## Author / Maintainer
 
