@@ -133,3 +133,8 @@ results/
 *.png
 *.jpeg
 *.jpg
+
+# IDE
+.idea
+.idea/
+.idea/**
