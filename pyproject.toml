@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ibex_1d"
+authors = [
+    { name="Ben Souchet", email="contact@bensouchet.dev" }
+]
+maintainers = [
+    { name="Ben Souchet", email="contact@bensouchet.dev" }
+]
+description = "Image 1D Barcode EXtractor - Detect and Extract 1D Barcode(s) in Photographs"
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+requires-python = ">=3.7"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3 :: Only"
+]
+keywords=["opencv", "computer-vision", "barcode", "detection", "extraction", "roi", "image-recognition"]
+dependencies = ["numpy", "opencv-python"]
+dynamic = ["version"]
+
+[project.scripts]
+ibex_1d = "ibex_1d:main"
+
+[project.urls]
+Repository = "https://github.com/BenSouchet/ibex_1d"
+"Bug Tracker" = "https://github.com/BenSouchet/ibex_1d/issues"
+
+[tool.setuptools]
+py-modules=["ibex_1d"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ibex_1d.__version__"}

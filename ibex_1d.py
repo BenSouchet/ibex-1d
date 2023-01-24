@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 SCRIPT_NAME = 'IBEX 1D : Image 1D Barcode EXtractor'
-VERSION = '1.2.0'
+__version__ = '1.2.0'
 
 RESULT_IMAGE_EXT = '.png'             # Can be any type handled by OpenCV, see documentation for valid values.
 DETECTION_IMAGE_MAX_DIM = 1024        # In pixels, if the largest dimension (width or height) of the input image is
@@ -739,8 +739,8 @@ def main() -> bool:
 
     parser = argparse.ArgumentParser(prog=SCRIPT_NAME,
                                      description='{} v{}, Detect and Extract 1D Barcodes in Photographs.'.format(
-                                         SCRIPT_NAME, VERSION))
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + VERSION)
+                                         SCRIPT_NAME, __version__))
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + __version__)
     parser.add_argument('-d', '--debug', action='store_true')
     parser.add_argument('-a', '--adaptive-threshold', action='store_true')
     parser.add_argument('-i', '--images-paths', nargs='+', required=True, type=str, action='extend',
