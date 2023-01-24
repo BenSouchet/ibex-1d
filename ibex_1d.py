@@ -26,7 +26,8 @@ BAR_DETECTION_FACTOR = 4.             # A multiplication factor used for the rad
 SCALE_DETECTED_BARCODE_FACTOR = 1.04  # A scale value superior to 1.0 to add an offset to detected barcode shape
 BARCODE_DEFORMATION_TOLERANCE = 0.01  # Above this value a complex method will be used to compute paper aspect ratio
 
-PATH_DIR_RESULTS = Path()
+PATH_DIR_RESULTS = Path.cwd().joinpath('results')
+PATH_DIR_CURRENT_RESULTS = Path()
 DEBUG = False
 
 
@@ -72,19 +73,22 @@ def init_logger() -> logging.Logger:
 LOG = init_logger()
 
 
-def delete_results_folder() -> bool:
-    """Delete the previously created folder that is used to store results barcodes extracted.
+def delete_folder(path: Path) -> bool:
+    """Delete a folder.
 
+    :param path: Path to an existing folder
+    :type path: Path
     :return: Success status of the delete operation
     :rtype: bool
     """
-    if PATH_DIR_RESULTS and PATH_DIR_RESULTS.exists():
+    if path and path.exists():
         try:
-            shutil.rmtree(PATH_DIR_RESULTS)
+            shutil.rmtree(path)
         except Exception as e:
-            LOG.error('Failed to delete the empty results folder. Reason: {}'.format(e))
+            LOG.error('Failed to delete the folder "{}". Reason: {}'.format(path, e))
             return False
-    return True
+        return True
+    return False
 
 
 def create_results_folder() -> bool:
@@ -93,15 +97,13 @@ def create_results_folder() -> bool:
     :return: Success status of the creation operation
     :rtype: bool
     """
-    working_directory = Path.cwd()
-
     # Step 1: Create the directory path for the results and set it as a global variable.
-    global PATH_DIR_RESULTS
-    PATH_DIR_RESULTS = working_directory.joinpath('results', datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+    global PATH_DIR_CURRENT_RESULTS
+    PATH_DIR_CURRENT_RESULTS = PATH_DIR_RESULTS.joinpath(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
 
     # Step 2: Creating the directories
     try:
-        PATH_DIR_RESULTS.mkdir(parents=True, exist_ok=True)
+        PATH_DIR_CURRENT_RESULTS.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         LOG.error('Failed to create results folder. Reason: {}'.format(e))
         return False
@@ -117,7 +119,7 @@ def save_to_results_folder(image: NDArray[numpy.uint8], filename: str):
     :param filename: The filename (without the extension) of the image to save
     :type filename: str
     """
-    cv.imwrite(str(PATH_DIR_RESULTS.joinpath(filename + RESULT_IMAGE_EXT)), image)
+    cv.imwrite(str(PATH_DIR_CURRENT_RESULTS.joinpath(filename + RESULT_IMAGE_EXT)), image)
 
 
 def downscale_image(image: NDArray[numpy.uint8]) -> tuple[float, NDArray[numpy.uint8]]:
@@ -249,13 +251,13 @@ def are_angles_equal(angle1: float, angle2: float, tolerance: float) -> bool:
     return diff <= tolerance
 
 
-def normalize_vector(vector: NDArray[numpy.uint8]) -> NDArray[numpy.uint8]:
+def normalize_vector(vector: NDArray[numpy.float32]) -> NDArray[numpy.float32]:
     """Normalize / converting to unit vector
 
     :param vector: A vector
-    :type vector: NDArray[numpy.uint8]
+    :type vector: NDArray[numpy.float32]
     :return: The normalized vector
-    :rtype: NDArray[numpy.uint8]
+    :rtype: NDArray[numpy.float32]
     """
     length = numpy.linalg.norm(vector)
     if length == 0:
@@ -263,18 +265,15 @@ def normalize_vector(vector: NDArray[numpy.uint8]) -> NDArray[numpy.uint8]:
     return vector / length
 
 
-def scale_contour_from_centroid(contour: NDArray[numpy.float32], scale: float, to_int: bool = False) -> \
-        NDArray[numpy.float32] | NDArray[numpy.uint8]:
+def scale_contour_from_centroid(contour: NDArray[numpy.float32], scale: float) -> NDArray[numpy.float32]:
     """Scale an OpenCV contour from its centroid.
 
     :param contour: NumPy array that represent a OpenCV contour
     :type contour: NDArray[numpy.float32]
     :param scale: Scale value, value in range [0, inf], a negative value should work but the contour will be "flipped"
     :type scale: float
-    :param to_int: Whether the result contour should be converted to an array of uint8 instead of float32
-    :type to_int: bool
     :return: The scaled contour
-    :rtype: NDArray[numpy.float32] | NDArray[numpy.uint8]
+    :rtype: NDArray[numpy.float32]
     """
     # Step 1: Determine the centroid of the contour
     moment = cv.moments(contour)
@@ -290,24 +289,18 @@ def scale_contour_from_centroid(contour: NDArray[numpy.float32], scale: float, t
     # Step 4: Move back the contour to it position
     contour += [float(center_x), float(center_y)]
 
-    if to_int:
-        return (numpy.rint(contour)).astype(int)
-
     return contour
 
 
-def _get_corners_from_contour(contour: NDArray[numpy.float32], to_int: bool = False) -> list[tuple[float, float]] | \
-                                                                                        list[tuple[int, int]]:
+def _get_corners_from_contour(contour: NDArray[numpy.float32]) -> list[tuple[float, float]]:
     """Contour should be simplified to 4 points, in this function the goal is to ensure that these points are
     properly ordered, first point should be the one closest to the top-left corner of the photograph and the remaining
     points should be clockwise ordered.
 
     :param contour: NumPy array that represent a OpenCV contour
     :type contour: NDArray[numpy.float32]
-    :param to_int: Whether the result contour should be converted to an array of uint8 instead of float32
-    :type to_int: bool
     :return: List of 4 2D points, clockwise ordered, that represent a quadrangle
-    :rtype: list[tuple[float, float]] | list[tuple[int, int]]
+    :rtype: list[tuple[float, float]]
     """
     # Remove useless dimensions
     contour = numpy.squeeze(contour)
@@ -339,17 +332,13 @@ def _get_corners_from_contour(contour: NDArray[numpy.float32], to_int: bool = Fa
         corners = [contour[index_pnt_tl], contour[index_pnt_next],
                    contour[index_pnt_last], contour[index_pnt_prev]]
 
-    # Step 3: Convert array to int (if requested)
-    if to_int:
-        corners = numpy.rint(corners).astype(int)
-
     return corners
 
 
 class BarCandidate:
-    points: list[tuple[int, int]]
+    points: list[tuple[float, float]]
     dimensions: tuple[float, float]
-    centroid: tuple[int, int]
+    centroid: tuple[float, float]
     area: float
     angle: float
     detection_radius: float
@@ -358,17 +347,16 @@ class BarCandidate:
         """Compute (and store) the radians angle of the bar with an up vector"""
         v0 = numpy.array((0, 1))
         v1 = normalize_vector(numpy.array(self.points[3]) - numpy.array(self.points[0]))
-
         self.angle = numpy.arctan2(numpy.linalg.det([v0, v1]), numpy.dot(v0, v1))
 
     def __init__(self, contour: NDArray[numpy.float32], area: float, dimensions: tuple[float, float]):
         # Points
-        self.points = _get_corners_from_contour(contour, to_int=True)
+        self.points = _get_corners_from_contour(contour)
         # Dimensions
         self.dimensions = dimensions
         # Centroid
         m = cv.moments(contour)
-        self.centroid = (round(m['m10'] / m['m00']), round(m['m01'] / m['m00']))
+        self.centroid = (m['m10'] / m['m00'], m['m01'] / m['m00'])
         # Area
         self.area = area
         # Angle (in radians)
@@ -731,9 +719,11 @@ def extract_barcodes(images_paths: list[str], use_adaptive_threshold: bool = Fal
         scale_factor = (1.0 / downscale_factor)
         _extract_barcodes_internal(image, groups, scale_factor, image_index)
 
-    # Step 3: Delete the created results folder if empty
-    if len(os.listdir(PATH_DIR_RESULTS)) == 0:
-        delete_results_folder()
+    # Step 3: Delete the created results folder(s) if empty
+    if len(os.listdir(PATH_DIR_CURRENT_RESULTS)) == 0:
+        success = delete_folder(PATH_DIR_CURRENT_RESULTS)
+        if success and len(os.listdir(PATH_DIR_RESULTS)) == 0:
+            delete_folder(PATH_DIR_RESULTS)
 
     return True
 
