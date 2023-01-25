@@ -1,0 +1,51 @@
+name: Publish Package
+run-name: Publish ${{ github.event.repository.name }}@${{ github.event.release.tag_name }} to PyPI
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Build Package ${{ github.event.repository.name }}@${{ github.event.release.tag_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Get Files of Version ${{ github.event.release.tag_name }}
+        uses: actions/checkout@v3
+      - name: Retrieve Package Setup Files
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git fetch
+          git checkout package .
+      - name: Install Python Module pypa/build
+        run: python3 -m pip install build --user
+      - name: Build Package
+        run: python3 -m build
+      - name: Save Built Versions (Wheel & Tar archive) as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: package
+          path: dist/
+  publish:
+    name: Publish Package to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Retrieve Built Versions from Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: package
+          path: dist/
+      - name: Publish ${{ github.event.repository.name }}@${{ github.event.release.tag_name }} to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
