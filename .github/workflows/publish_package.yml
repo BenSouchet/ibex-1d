@@ -20,8 +20,9 @@ jobs:
         run: |
           git config --global user.name 'GitHub Action'
           git config --global user.email 'action@github.com'
+          git remote update
           git fetch
-          git checkout package .
+          git checkout origin/package .
       - name: Install Python Module pypa/build
         run: python3 -m pip install build --user
       - name: Build Package
