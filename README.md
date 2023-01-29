@@ -46,7 +46,7 @@ python3 ibex_1d.py -i ~/Desktop/IMG_3212.png
 
 If you called **IBEX 1D** via your terminal (as a script), the barcode images extracted will be saved into a newly created folder inside a folder `./results/`, if nothing has been generated please check the log(s) in your terminal.
 
-Otherwise if you called the function `extract_barcodes` you will received a python list of `ibex_1d.Result`, this class store inof and barcode(s) image(s) extracted for each image path passed to the function.
+Otherwise if you called the function `find_barcodes` you will received a python list of `ibex_1d.Result`, this class store info about the execution (like execution status, message, debug steps) and the barcode(s) image(s) extracted for each image path passed to the function.
 
 ## Multiple images
 
