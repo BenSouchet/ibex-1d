@@ -18,7 +18,7 @@ pip3 install ibex_1d
 
 ### Via Source Code
 
-Download the [latest release](https://github.com/BenSouchet/ibex_1d/releases) or clone/download this repository, then:
+Download the [latest release](https://github.com/BenSouchet/ibex_1d/releases) or clone/download this repository.
 
 ## Usage
 If you installed the package (via `pip3`) you can either import the package in your project:
