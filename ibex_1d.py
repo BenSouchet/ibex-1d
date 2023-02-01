@@ -12,7 +12,7 @@ from enum import Enum
 
 SCRIPT_NAME = 'IBEX 1D'
 SCRIPT_LONG_NAME = 'IBEX 1D : Image 1D Barcode EXtractor'
-__version__ = '1.3.0'
+__version__ = '1.3.2'
 
 
 class _ColoredFormatter(logging.Formatter):
