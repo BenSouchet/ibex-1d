@@ -770,10 +770,12 @@ def save_results_to_disk(results: list[Result], folder_path: Path, image_extensi
         # Check status and print log message if needed
         if result.status == ResultStatus.ERROR:
             images_error_occured = True
-            logger.error("{} - {}".format(result.original_image_path, result.message))
+            if logger:
+                logger.error("{} - {}".format(result.original_image_path, result.message))
             continue
         elif result.status == ResultStatus.WARNING:
-            logger.warning("{} - {}".format(result.original_image_path, result.message))
+            if logger:
+                logger.warning("{} - {}".format(result.original_image_path, result.message))
             continue
 
         # Create a folder for the input image, to store steps and barcode(s)
@@ -798,7 +800,7 @@ def save_results_to_disk(results: list[Result], folder_path: Path, image_extensi
 
     # If no images has been saved delete the useless folder previously created
     if len(os.listdir(path_curr_results)) == 0:
-        _delete_folder(path_curr_results)
+        _delete_folder(path_curr_results, logger)
 
     return images_error_occured
 
