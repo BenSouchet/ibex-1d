@@ -13,7 +13,11 @@ A `Python 3` command line script to detect & extract barcode(s) in images, using
 ### Via PIP
 
 ```sh
-pip3 install ibex_1d
+pip3 install ibex-1d
+```
+And for update to latest version use:
+```sh
+pip3 install --upgrade ibex-1d
 ```
 
 ### Via Source Code
@@ -37,7 +41,7 @@ Or use it as a script directly in you terminal:
 ibex_1d -i ~/Desktop/IMG_3212.png
 ```
 
-If you download a release or clone the repository to use it as a script:
+If you download a release or clone the repository, to use it as a script:
 ```sh
 python3 ibex_1d.py -i ~/Desktop/IMG_3212.png
 ```
