@@ -22,7 +22,7 @@ pip3 install --upgrade ibex-1d
 
 ### Via Source Code
 
-Download the [latest release](https://github.com/BenSouchet/ibex_1d/releases) or clone/download this repository.
+Download the [latest release](https://github.com/BenSouchet/ibex-1d/releases) or clone/download this repository.
 
 ## Usage
 If you installed the package (via `pip3`) you can either import the package in your project:
@@ -88,7 +88,7 @@ This will add debug/steps images into the result sub-folders.
 ## Errors / Warnings
 
 In case of an error you should see a formatted log message in your terminal telling you exactly what is the issue.
-If the script crash or something don't work you can open an issue [here](https://github.com/BenSouchet/ibex_1d/issues).
+If the script crash or something don't work you can open an issue [here](https://github.com/BenSouchet/ibex-1d/issues).
 
 ## Author / Maintainer
 
@@ -96,4 +96,4 @@ If the script crash or something don't work you can open an issue [here](https:/
 
 ## Licenses
 
-The code present in this repository is under [MIT license](https://github.com/BenSouchet/ibex_1d/blob/main/LICENSE).
+The code present in this repository is under [MIT license](https://github.com/BenSouchet/ibex-1d/blob/main/LICENSE).
