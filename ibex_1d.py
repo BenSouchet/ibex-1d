@@ -12,7 +12,7 @@ from enum import Enum
 
 SCRIPT_NAME = 'IBEX 1D'
 SCRIPT_LONG_NAME = 'IBEX 1D : Image 1D Barcode EXtractor'
-__version__ = '1.3.2'
+__version__ = '1.3.3'
 
 
 class _ColoredFormatter(logging.Formatter):
@@ -193,6 +193,17 @@ def scale_contour_from_centroid(contour: NDArray[numpy.float32], scale: float) -
     return contour
 
 
+def _is_clockwise(points: NDArray[numpy.float32]) -> bool:
+    sum = 0.
+    prev = points[-1]
+
+    for curr in points:
+        sum += (curr[0] - prev[0]) * (curr[1] + prev[1])
+        prev = curr
+
+    return sum <= 0.
+
+
 def _get_corners_from_contour(contour: NDArray[numpy.float32]) -> list[tuple[float, float]]:
     """Contour should be simplified to 4 points, in this function the goal is to ensure that these points are
     properly ordered, first point should be the one closest to the top-left corner of the photograph and the remaining
@@ -224,14 +235,13 @@ def _get_corners_from_contour(contour: NDArray[numpy.float32]) -> list[tuple[flo
 
     # Step 2.B: Comparing x-axis values of the neighbours of the top left point find out if the
     #           contour has been sorted in clockwise or counter-clockwise
-    if contour[index_pnt_prev][0] > contour[index_pnt_next][0]:
+    if _is_clockwise(contour):
+        corners = [contour[index_pnt_tl], contour[index_pnt_next],
+                   contour[index_pnt_last], contour[index_pnt_prev]]
+    else:
         # Counter-clockwise
         corners = [contour[index_pnt_tl], contour[index_pnt_prev],
                    contour[index_pnt_last], contour[index_pnt_next]]
-    else:
-        # Clockwise
-        corners = [contour[index_pnt_tl], contour[index_pnt_next],
-                   contour[index_pnt_last], contour[index_pnt_prev]]
 
     return corners
 
@@ -320,7 +330,7 @@ class Settings:
         self.simplified_contour_max_coef = .15
         self.min_split_barcode = 70
         self.min_bar_number = 18
-        self.bar_detection_factor = 4.
+        self.bar_detection_factor = 4.5
         self.scale_detected_barcode_factor = 1.04
         self.barcode_deformation_tolerance = .01
         self.use_adaptive_threshold = False
@@ -415,8 +425,8 @@ class ImageBarcodeExtract1D:
             for current in group:
                 for index_candidate, candidate in reversed(list(enumerate(candidates))):
                     if are_angles_equal(current.angle, candidate.angle, tolerance=0.07) and \
-                                        numpy.linalg.norm(numpy.subtract(candidate.centroid, current.centroid)) <= max(
-                                        current.detection_radius, candidate.detection_radius):
+                                        numpy.linalg.norm(numpy.subtract(candidate.centroid, current.centroid)) <= \
+                                        (current.detection_radius + candidate.detection_radius):
                         group.append(candidates.pop(index_candidate))
             groups.append(group)
 
@@ -772,11 +782,9 @@ def save_results_to_disk(results: list[Result], folder_path: Path, image_extensi
             images_error_occured = True
             if logger:
                 logger.error("{} - {}".format(result.original_image_path, result.message))
-            continue
         elif result.status == ResultStatus.WARNING:
             if logger:
                 logger.warning("{} - {}".format(result.original_image_path, result.message))
-            continue
 
         # Create a folder for the input image, to store steps and barcode(s)
         path_results_curr_image = path_curr_results.joinpath(result.original_image_path.stem)
